@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="ru">
 <head>
   <meta charset="utf-8" />
   <meta
@@ -21,23 +21,50 @@
 
     body {
       color: #f2efe6;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-family: Inter, Arial, sans-serif;
     }
 
-    #status {
+    #launch-hint {
       position: fixed;
+      z-index: 999;
+      left: 50%;
+      bottom: 16px;
+      transform: translateX(-50%);
+      width: min(720px, calc(100% - 32px));
+      box-sizing: border-box;
+      padding: 10px 14px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(0, 0, 0, 0.78);
+      color: #f2efe6;
+      font-size: 13px;
+      line-height: 1.4;
+      text-align: center;
+      pointer-events: none;
+      backdrop-filter: blur(8px);
+    }
+
+    #launch-hint[hidden] {
+      display: none;
+    }
+
+    #error {
+      position: fixed;
+      z-index: 2000;
       inset: 0;
-      z-index: 1000;
       display: grid;
       place-items: center;
-      padding: 24px;
-      text-align: center;
-      white-space: pre-wrap;
+      box-sizing: border-box;
+      padding: 28px;
       background: #000;
       color: #f2efe6;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 14px;
+      line-height: 1.5;
+      text-align: center;
+      white-space: pre-wrap;
     }
 
-    #status[hidden] {
+    #error[hidden] {
       display: none;
     }
   </style>
@@ -45,11 +72,18 @@
 
 <body>
   <div id="game"></div>
-  <div id="status">Loading NES emulator...</div>
+
+  <div id="launch-hint">
+    Если игра не запустилась автоматически — нажмите «ЗАГРУЗИТЬ ИГРУ»
+    или кликните по экрану.
+  </div>
+
+  <div id="error" hidden></div>
 
   <script>
     (function () {
-      var status = document.getElementById('status');
+      var launchHint = document.getElementById('launch-hint');
+      var errorBox = document.getElementById('error');
       var params = new URLSearchParams(window.location.search);
       var core = (params.get('core') || '').toLowerCase();
       var rom = params.get('rom') || '';
@@ -58,32 +92,56 @@
       var allowedInputIndexes = [0, 2, 3, 4, 5, 6, 7, 8];
       var pendingInputs = new Map();
       var gameStarted = false;
-      var watchdog = null;
 
-      function notifyParent(type, message) {
+      function fail(message) {
+        errorBox.hidden = false;
+        errorBox.textContent = message;
+      }
+
+      function parseTopLaunchContext() {
         try {
-          window.parent.postMessage(
-            {
-              source: 'save-arcade-emulator',
-              type: type,
-              message: message || ''
-            },
-            window.location.origin
-          );
+          var hash = window.top.location.hash || '';
+          var q = hash.indexOf('?');
+          var route = q >= 0 ? hash.slice(1, q) : hash.slice(1);
+          var query = new URLSearchParams(q >= 0 ? hash.slice(q + 1) : '');
+          var match = route.match(/^\/play\/([^/?#]+)/);
+
+          return {
+            gameId: match ? decodeURIComponent(match[1]) : '',
+            launchId: query.get('launch') || ''
+          };
         } catch (error) {
-          // Diagnostics must never block the emulator.
+          return {
+            gameId: '',
+            launchId: ''
+          };
         }
       }
 
-      function fail(message) {
-        if (watchdog) {
-          clearTimeout(watchdog);
-          watchdog = null;
+      function notifyGameCardStarted() {
+        var context = parseTopLaunchContext();
+
+        if (!context.gameId || !context.launchId) {
+          return;
         }
 
-        status.hidden = false;
-        status.textContent = message;
-        notifyParent('emulator-error', message);
+        try {
+          var opener = window.top.opener;
+
+          if (opener && !opener.closed) {
+            opener.postMessage(
+              {
+                source: 'save-arcade-player',
+                type: 'game_started',
+                gameId: context.gameId,
+                launchId: context.launchId
+              },
+              window.location.origin
+            );
+          }
+        } catch (error) {
+          // Referral notification must never break the game.
+        }
       }
 
       function gameManager() {
@@ -189,12 +247,23 @@
         return;
       }
 
+      var canAutoStart =
+        !!(
+          navigator.userActivation &&
+          navigator.userActivation.isActive
+        );
+
       window.EJS_player = '#game';
       window.EJS_core = core;
       window.EJS_controlScheme = 'nes';
       window.EJS_gameName = name;
       window.EJS_gameUrl = romUrl.href;
-      window.EJS_startOnLoaded = true;
+
+      // Start automatically only if the browser actually exposes an active
+      // user gesture in this new tab. Otherwise use EmulatorJS native start UI.
+      window.EJS_startOnLoaded = canAutoStart;
+      window.EJS_startButtonName = 'ЗАГРУЗИТЬ ИГРУ';
+
       window.EJS_CacheLimit = 1;
       window.EJS_pathtodata = 'https://cdn.emulatorjs.org/4.2.3/data/';
       window.EJS_color = '#B94732';
@@ -203,15 +272,9 @@
 
       window.EJS_onGameStart = function () {
         gameStarted = true;
-
-        if (watchdog) {
-          clearTimeout(watchdog);
-          watchdog = null;
-        }
-
-        status.hidden = true;
+        launchHint.hidden = true;
         flushInputs();
-        notifyParent('game-started');
+        notifyGameCardStarted();
       };
 
       window.EJS_ready = function () {
@@ -221,20 +284,6 @@
       var loader = document.createElement('script');
       loader.src = 'https://cdn.emulatorjs.org/4.2.3/data/loader.js';
       loader.async = true;
-
-      loader.onload = function () {
-        status.hidden = false;
-        status.textContent = 'Starting NES game...';
-
-        watchdog = setTimeout(function () {
-          if (!gameStarted) {
-            fail(
-              'EmulatorJS loaded, but the game did not start.\n' +
-              'The player kept this message visible for diagnostics.'
-            );
-          }
-        }, 20000);
-      };
 
       loader.onerror = function () {
         fail('Could not load EmulatorJS.');
