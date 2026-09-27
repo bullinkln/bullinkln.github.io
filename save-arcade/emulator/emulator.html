@@ -32,6 +32,7 @@
       place-items: center;
       padding: 24px;
       text-align: center;
+      white-space: pre-wrap;
       background: #000;
       color: #f2efe6;
     }
@@ -50,18 +51,39 @@
     (function () {
       var status = document.getElementById('status');
       var params = new URLSearchParams(window.location.search);
-
       var core = (params.get('core') || '').toLowerCase();
       var rom = params.get('rom') || '';
       var name = params.get('name') || 'NES Game';
-
       var allowedCores = ['nes', 'fceumm', 'nestopia'];
       var allowedInputIndexes = [0, 2, 3, 4, 5, 6, 7, 8];
       var pendingInputs = new Map();
+      var gameStarted = false;
+      var watchdog = null;
+
+      function notifyParent(type, message) {
+        try {
+          window.parent.postMessage(
+            {
+              source: 'save-arcade-emulator',
+              type: type,
+              message: message || ''
+            },
+            window.location.origin
+          );
+        } catch (error) {
+          // Diagnostics must never block the emulator.
+        }
+      }
 
       function fail(message) {
+        if (watchdog) {
+          clearTimeout(watchdog);
+          watchdog = null;
+        }
+
         status.hidden = false;
         status.textContent = message;
+        notifyParent('emulator-error', message);
       }
 
       function gameManager() {
@@ -124,6 +146,25 @@
         applyInput(index, value);
       });
 
+      window.addEventListener('error', function (event) {
+        if (!gameStarted) {
+          fail(
+            'Emulator error: ' +
+            (event && event.message ? event.message : 'unknown error')
+          );
+        }
+      });
+
+      window.addEventListener('unhandledrejection', function (event) {
+        if (!gameStarted) {
+          var reason = event && event.reason;
+          fail(
+            'Emulator promise error: ' +
+            (reason && reason.message ? reason.message : String(reason || 'unknown'))
+          );
+        }
+      });
+
       if (allowedCores.indexOf(core) === -1) {
         fail('Unsupported emulator core.');
         return;
@@ -153,32 +194,24 @@
       window.EJS_controlScheme = 'nes';
       window.EJS_gameName = name;
       window.EJS_gameUrl = romUrl.href;
-
-      /*
-       * PLAY should boot immediately.
-       * Version 4.2.3 uses EJS_CacheLimit; keep ROM cache effectively disabled
-       * while save-state work remains a separate milestone.
-       */
       window.EJS_startOnLoaded = true;
       window.EJS_CacheLimit = 1;
-
-      /* Pin P5/mobile prototype to the stable version used for this bridge. */
       window.EJS_pathtodata = 'https://cdn.emulatorjs.org/4.2.3/data/';
-
-      /* SAVE player visual tokens inside the emulator frame. */
       window.EJS_color = '#B94732';
       window.EJS_backgroundColor = '#000000';
-
-      /*
-       * Outer React controls own touch input.
-       * Force EmulatorJS desktop UI so its built-in mobile virtual pad
-       * does not compete with the SAVE handheld controls.
-       */
       window.EJS_browserMode = 'desktop';
 
       window.EJS_onGameStart = function () {
+        gameStarted = true;
+
+        if (watchdog) {
+          clearTimeout(watchdog);
+          watchdog = null;
+        }
+
         status.hidden = true;
         flushInputs();
+        notifyParent('game-started');
       };
 
       window.EJS_ready = function () {
@@ -190,7 +223,17 @@
       loader.async = true;
 
       loader.onload = function () {
-        status.hidden = true;
+        status.hidden = false;
+        status.textContent = 'Starting NES game...';
+
+        watchdog = setTimeout(function () {
+          if (!gameStarted) {
+            fail(
+              'EmulatorJS loaded, but the game did not start.\n' +
+              'The player kept this message visible for diagnostics.'
+            );
+          }
+        }, 20000);
       };
 
       loader.onerror = function () {
