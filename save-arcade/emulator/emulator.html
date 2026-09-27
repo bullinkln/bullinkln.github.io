@@ -9,105 +9,264 @@
   <title>SAVE Arcade Emulator</title>
 
   <style>
+    :root {
+      color-scheme: dark;
+      --save-accent: #c84d37;
+      --save-text: #f4f1e8;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
     html,
     body,
     #game {
       width: 100%;
       height: 100%;
       margin: 0;
+    }
+
+    html,
+    body {
       background: #000;
       overflow: hidden;
     }
 
     body {
-      color: #f2efe6;
+      position: relative;
+      color: var(--save-text);
       font-family: Inter, Arial, sans-serif;
     }
 
-    #launch-hint {
-      position: fixed;
-      z-index: 999;
-      left: 50%;
-      bottom: 16px;
-      transform: translateX(-50%);
-      width: min(720px, calc(100% - 32px));
-      box-sizing: border-box;
-      padding: 10px 14px;
-      border: 1px solid rgba(255, 255, 255, 0.16);
-      background: rgba(0, 0, 0, 0.78);
-      color: #f2efe6;
-      font-size: 13px;
-      line-height: 1.4;
-      text-align: center;
+    #game {
+      position: absolute;
+      inset: 0;
+      background: #000;
+      opacity: 0;
       pointer-events: none;
-      backdrop-filter: blur(8px);
+      transition: opacity 140ms ease-out;
     }
 
-    #launch-hint[hidden] {
-      display: none;
+    body[data-state="running"] #game {
+      opacity: 1;
+      pointer-events: auto;
     }
 
-    #error {
-      position: fixed;
-      z-index: 2000;
+    #game .ejs_start_button {
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+
+    #save-launch {
+      position: absolute;
+      z-index: 1000;
       inset: 0;
       display: grid;
       place-items: center;
-      box-sizing: border-box;
-      padding: 28px;
+      overflow: hidden;
       background: #000;
-      color: #f2efe6;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 14px;
-      line-height: 1.5;
-      text-align: center;
-      white-space: pre-wrap;
+      opacity: 1;
+      transition: opacity 140ms ease-out;
     }
 
-    #error[hidden] {
-      display: none;
+    body[data-state="running"] #save-launch {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .save-poster {
+      position: relative;
+      width: min(84vw, 920px);
+      height: min(72vh, 620px);
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      background: #000;
+      cursor: default;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .save-poster[data-ready="true"] {
+      cursor: pointer;
+    }
+
+    .save-poster__image {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      object-position: center;
+      image-rendering: pixelated;
+      filter: brightness(0.78);
+      background: #000;
+      pointer-events: none;
+    }
+
+    .save-poster__shade {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(
+          circle at center,
+          rgba(0, 0, 0, 0.02) 0%,
+          rgba(0, 0, 0, 0.1) 42%,
+          rgba(0, 0, 0, 0.34) 100%
+        );
+      pointer-events: none;
+    }
+
+    .save-play {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: clamp(86px, 9vw, 112px);
+      height: clamp(86px, 9vw, 112px);
+      transform: translate(-50%, -50%) scale(0.94);
+      border: 0;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      background: var(--save-accent);
+      box-shadow:
+        0 12px 34px rgba(0, 0, 0, 0.52),
+        0 0 0 1px rgba(255, 255, 255, 0.16);
+      opacity: 0;
+      cursor: pointer;
+      transition:
+        transform 130ms ease,
+        opacity 130ms ease,
+        box-shadow 130ms ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .save-poster[data-ready="true"] .save-play {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    .save-play:hover {
+      transform: translate(-50%, -50%) scale(1.06) !important;
+      box-shadow:
+        0 16px 42px rgba(0, 0, 0, 0.58),
+        0 0 0 1px rgba(255, 255, 255, 0.24);
+    }
+
+    .save-play:active {
+      transform: translate(-50%, -50%) scale(0.96) !important;
+    }
+
+    .save-play__triangle {
+      width: 0;
+      height: 0;
+      margin-left: 8px;
+      border-top: 18px solid transparent;
+      border-bottom: 18px solid transparent;
+      border-left: 29px solid #fff;
+      pointer-events: none;
+    }
+
+    .save-caption {
+      position: absolute;
+      z-index: 2;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      color: rgba(244, 241, 232, 0.76);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
+
+    @media (max-width: 680px) {
+      .save-poster {
+        width: 94vw;
+        height: 68vh;
+      }
+
+      .save-play {
+        width: 86px;
+        height: 86px;
+      }
+
+      .save-play__triangle {
+        margin-left: 6px;
+        border-top-width: 15px;
+        border-bottom-width: 15px;
+        border-left-width: 24px;
+      }
+
+      .save-caption {
+        bottom: 12px;
+        font-size: 11px;
+      }
     }
   </style>
 </head>
 
-<body>
+<body data-state="boot">
   <div id="game"></div>
 
-  <div id="launch-hint">
-    Если игра не запустилась автоматически — нажмите «ЗАГРУЗИТЬ ИГРУ»
-    или кликните по экрану.
-  </div>
+  <div id="save-launch" aria-label="Играть">
+    <div id="save-poster" class="save-poster" data-ready="false">
+      <img
+        id="save-poster-image"
+        class="save-poster__image"
+        alt=""
+        draggable="false"
+      />
+      <div class="save-poster__shade"></div>
 
-  <div id="error" hidden></div>
+      <button
+        id="save-play"
+        class="save-play"
+        type="button"
+        aria-label="Играть"
+      >
+        <span class="save-play__triangle"></span>
+      </button>
+
+      <div class="save-caption">Играть</div>
+    </div>
+  </div>
 
   <script>
     (function () {
-      var launchHint = document.getElementById('launch-hint');
-      var errorBox = document.getElementById('error');
       var params = new URLSearchParams(window.location.search);
       var core = (params.get('core') || '').toLowerCase();
       var rom = params.get('rom') || '';
       var name = params.get('name') || 'NES Game';
+
+      var poster = document.getElementById('save-poster');
+      var posterImage = document.getElementById('save-poster-image');
+      var playButton = document.getElementById('save-play');
+
       var allowedCores = ['nes', 'fceumm', 'nestopia'];
       var allowedInputIndexes = [0, 2, 3, 4, 5, 6, 7, 8];
       var pendingInputs = new Map();
+
       var gameStarted = false;
+      var nativeStartButton = null;
+      var startPollTimer = null;
 
-      function fail(message) {
-        errorBox.hidden = false;
-        errorBox.textContent = message;
-      }
-
-      function parseTopLaunchContext() {
+      function parsePlayerContext() {
         try {
           var hash = window.top.location.hash || '';
-          var q = hash.indexOf('?');
-          var route = q >= 0 ? hash.slice(1, q) : hash.slice(1);
-          var query = new URLSearchParams(q >= 0 ? hash.slice(q + 1) : '');
+          var queryIndex = hash.indexOf('?');
+          var route =
+            queryIndex >= 0 ? hash.slice(1, queryIndex) : hash.slice(1);
+          var query = new URLSearchParams(
+            queryIndex >= 0 ? hash.slice(queryIndex + 1) : ''
+          );
           var match = route.match(/^\/play\/([^/?#]+)/);
+          var gameId = match ? decodeURIComponent(match[1]) : '';
 
           return {
-            gameId: match ? decodeURIComponent(match[1]) : '',
+            gameId: gameId,
             launchId: query.get('launch') || ''
           };
         } catch (error) {
@@ -118,8 +277,68 @@
         }
       }
 
+      function gameAssetParts(gameId) {
+        var dash = gameId.indexOf('-');
+
+        if (dash <= 0 || dash >= gameId.length - 1) {
+          return null;
+        }
+
+        return {
+          consoleId: gameId.slice(0, dash),
+          slug: gameId.slice(dash + 1)
+        };
+      }
+
+      function previewCandidates() {
+        var context = parsePlayerContext();
+        var parts = gameAssetParts(context.gameId);
+
+        if (!parts) {
+          return [];
+        }
+
+        var base =
+          '../assets/games/' +
+          encodeURIComponent(parts.consoleId) +
+          '/' +
+          parts.slug
+            .split('/')
+            .map(encodeURIComponent)
+            .join('/') +
+          '/';
+
+        return [
+          new URL(base + 'screenshot-01.png', window.location.href).href,
+          new URL(base + 'screenshot-02.png', window.location.href).href,
+          new URL(base + 'cover.png', window.location.href).href
+        ];
+      }
+
+      function setPosterImage() {
+        var candidates = previewCandidates();
+        var index = 0;
+
+        if (candidates.length === 0) {
+          return;
+        }
+
+        function next() {
+          if (index >= candidates.length) {
+            posterImage.removeAttribute('src');
+            return;
+          }
+
+          posterImage.src = candidates[index];
+          index += 1;
+        }
+
+        posterImage.addEventListener('error', next);
+        next();
+      }
+
       function notifyGameCardStarted() {
-        var context = parseTopLaunchContext();
+        var context = parsePlayerContext();
 
         if (!context.gameId || !context.launchId) {
           return;
@@ -140,7 +359,7 @@
             );
           }
         } catch (error) {
-          // Referral notification must never break the game.
+          // Referral notification must never block the game.
         }
       }
 
@@ -179,6 +398,57 @@
         pendingInputs.clear();
       }
 
+      function setStartReady(button) {
+        nativeStartButton = button;
+        poster.setAttribute('data-ready', 'true');
+
+        var active =
+          !!(
+            navigator.userActivation &&
+            navigator.userActivation.isActive
+          );
+
+        if (active) {
+          button.click();
+        }
+      }
+
+      function findNativeStartButton() {
+        if (gameStarted || nativeStartButton) {
+          return;
+        }
+
+        var button = document.querySelector('#game .ejs_start_button');
+
+        if (button) {
+          if (startPollTimer) {
+            clearInterval(startPollTimer);
+            startPollTimer = null;
+          }
+
+          setStartReady(button);
+        }
+      }
+
+      function requestStart() {
+        if (!nativeStartButton || gameStarted) {
+          return;
+        }
+
+        // This click occurs synchronously inside the user's click handler,
+        // so browser user activation is preserved.
+        nativeStartButton.click();
+      }
+
+      playButton.addEventListener('click', requestStart);
+      poster.addEventListener('click', function (event) {
+        if (event.target === playButton) {
+          return;
+        }
+
+        requestStart();
+      });
+
       window.addEventListener('message', function (event) {
         if (event.origin !== window.location.origin) {
           return;
@@ -204,32 +474,7 @@
         applyInput(index, value);
       });
 
-      window.addEventListener('error', function (event) {
-        if (!gameStarted) {
-          fail(
-            'Emulator error: ' +
-            (event && event.message ? event.message : 'unknown error')
-          );
-        }
-      });
-
-      window.addEventListener('unhandledrejection', function (event) {
-        if (!gameStarted) {
-          var reason = event && event.reason;
-          fail(
-            'Emulator promise error: ' +
-            (reason && reason.message ? reason.message : String(reason || 'unknown'))
-          );
-        }
-      });
-
-      if (allowedCores.indexOf(core) === -1) {
-        fail('Unsupported emulator core.');
-        return;
-      }
-
-      if (!rom) {
-        fail('ROM URL is missing.');
+      if (allowedCores.indexOf(core) === -1 || !rom) {
         return;
       }
 
@@ -238,20 +483,14 @@
       try {
         romUrl = new URL(rom, window.location.href);
       } catch (error) {
-        fail('ROM URL is invalid.');
         return;
       }
 
       if (romUrl.origin !== window.location.origin) {
-        fail('ROM must be same-origin.');
         return;
       }
 
-      var canAutoStart =
-        !!(
-          navigator.userActivation &&
-          navigator.userActivation.isActive
-        );
+      setPosterImage();
 
       window.EJS_player = '#game';
       window.EJS_core = core;
@@ -259,35 +498,46 @@
       window.EJS_gameName = name;
       window.EJS_gameUrl = romUrl.href;
 
-      // Start automatically only if the browser actually exposes an active
-      // user gesture in this new tab. Otherwise use EmulatorJS native start UI.
-      window.EJS_startOnLoaded = canAutoStart;
-      window.EJS_startButtonName = 'ЗАГРУЗИТЬ ИГРУ';
+      // Native EJS start UI stays hidden under the SAVE overlay.
+      // We click that native start control from our own PLAY overlay.
+      window.EJS_startOnLoaded = false;
+      window.EJS_startButtonName = 'PLAY';
 
       window.EJS_CacheLimit = 1;
       window.EJS_pathtodata = 'https://cdn.emulatorjs.org/4.2.3/data/';
-      window.EJS_color = '#B94732';
+      window.EJS_color = '#C84D37';
       window.EJS_backgroundColor = '#000000';
       window.EJS_browserMode = 'desktop';
 
       window.EJS_onGameStart = function () {
         gameStarted = true;
-        launchHint.hidden = true;
+
+        if (startPollTimer) {
+          clearInterval(startPollTimer);
+          startPollTimer = null;
+        }
+
+        document.body.setAttribute('data-state', 'running');
         flushInputs();
         notifyGameCardStarted();
       };
 
       window.EJS_ready = function () {
         flushInputs();
+        findNativeStartButton();
       };
 
       var loader = document.createElement('script');
       loader.src = 'https://cdn.emulatorjs.org/4.2.3/data/loader.js';
       loader.async = true;
 
-      loader.onerror = function () {
-        fail('Could not load EmulatorJS.');
-      };
+      loader.addEventListener('load', function () {
+        findNativeStartButton();
+
+        if (!nativeStartButton) {
+          startPollTimer = setInterval(findNativeStartButton, 50);
+        }
+      });
 
       document.body.appendChild(loader);
     })();
