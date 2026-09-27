@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 560">
+  <rect width="420" height="560" fill="#202431"/>
+  <circle cx="319" cy="134" r="73" fill="#F2EFE6"/>
+  <rect x="0" y="392" width="420" height="168" fill="#101319"/>
+  <path d="M0 437 L118 325 L181 392 L260 280 L420 409 V560 H0Z" fill="#B94732"/>
+  <rect x="193" y="258" width="46" height="101" fill="#0A0D12"/>
+  <text x="24" y="52" fill="#F2EFE6" font-family="monospace" font-size="34" font-weight="700">SHADOW RUNNER</text>
+</svg>

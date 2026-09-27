@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360">
+  <rect width="640" height="360" fill="#CEC5B0"/>
+  <circle cx="486" cy="86" r="47" fill="#F2EFE6"/>
+  <rect x="0" y="252" width="640" height="108" fill="#101319"/>
+  <path d="M0 281 L179 209 L275 252 L397 180 L640 263 V360 H0Z" fill="#2A2A27"/>
+  <rect x="294" y="166" width="70" height="65" fill="#0A0D12"/>
+  <text x="24" y="52" fill="#F2EFE6" font-family="monospace" font-size="24" font-weight="700">MANUAL 03</text>
+</svg>

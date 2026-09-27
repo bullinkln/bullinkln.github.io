@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta
+    name="viewport"
+    content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"
+  />
+  <title>SAVE Arcade Emulator</title>
+
+  <style>
+    html,
+    body,
+    #game {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      background: #000;
+      overflow: hidden;
+    }
+
+    body {
+      color: #f2efe6;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    #status {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      text-align: center;
+      background: #000;
+      color: #f2efe6;
+    }
+
+    #status[hidden] {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="game"></div>
+  <div id="status">Loading NES emulator...</div>
+
+  <script>
+    (function () {
+      var status = document.getElementById('status');
+      var params = new URLSearchParams(window.location.search);
+
+      var core = (params.get('core') || '').toLowerCase();
+      var rom = params.get('rom') || '';
+      var name = params.get('name') || 'NES Game';
+
+      var allowedCores = ['nes', 'fceumm', 'nestopia'];
+      var allowedInputIndexes = [0, 2, 3, 4, 5, 6, 7, 8];
+      var pendingInputs = new Map();
+
+      function fail(message) {
+        status.hidden = false;
+        status.textContent = message;
+      }
+
+      function gameManager() {
+        return (
+          window.EJS_emulator &&
+          window.EJS_emulator.gameManager &&
+          typeof window.EJS_emulator.gameManager.simulateInput === 'function'
+        )
+          ? window.EJS_emulator.gameManager
+          : null;
+      }
+
+      function applyInput(index, value) {
+        var manager = gameManager();
+
+        if (!manager) {
+          pendingInputs.set(index, value);
+          return;
+        }
+
+        manager.simulateInput(0, index, value);
+      }
+
+      function flushInputs() {
+        var manager = gameManager();
+
+        if (!manager) {
+          return;
+        }
+
+        pendingInputs.forEach(function (value, index) {
+          manager.simulateInput(0, index, value);
+        });
+
+        pendingInputs.clear();
+      }
+
+      window.addEventListener('message', function (event) {
+        if (event.origin !== window.location.origin) {
+          return;
+        }
+
+        var data = event.data;
+
+        if (
+          !data ||
+          data.source !== 'save-arcade-player' ||
+          data.type !== 'nes-input'
+        ) {
+          return;
+        }
+
+        var index = Number(data.index);
+        var value = data.value === 1 ? 1 : 0;
+
+        if (allowedInputIndexes.indexOf(index) === -1) {
+          return;
+        }
+
+        applyInput(index, value);
+      });
+
+      if (allowedCores.indexOf(core) === -1) {
+        fail('Unsupported emulator core.');
+        return;
+      }
+
+      if (!rom) {
+        fail('ROM URL is missing.');
+        return;
+      }
+
+      var romUrl;
+
+      try {
+        romUrl = new URL(rom, window.location.href);
+      } catch (error) {
+        fail('ROM URL is invalid.');
+        return;
+      }
+
+      if (romUrl.origin !== window.location.origin) {
+        fail('ROM must be same-origin.');
+        return;
+      }
+
+      window.EJS_player = '#game';
+      window.EJS_core = core;
+      window.EJS_controlScheme = 'nes';
+      window.EJS_gameName = name;
+      window.EJS_gameUrl = romUrl.href;
+
+      /*
+       * PLAY should boot immediately.
+       * Version 4.2.3 uses EJS_CacheLimit; keep ROM cache effectively disabled
+       * while save-state work remains a separate milestone.
+       */
+      window.EJS_startOnLoaded = true;
+      window.EJS_CacheLimit = 1;
+
+      /* Pin P5/mobile prototype to the stable version used for this bridge. */
+      window.EJS_pathtodata = 'https://cdn.emulatorjs.org/4.2.3/data/';
+
+      /* SAVE player visual tokens inside the emulator frame. */
+      window.EJS_color = '#B94732';
+      window.EJS_backgroundColor = '#000000';
+
+      /*
+       * Outer React controls own touch input.
+       * Force EmulatorJS desktop UI so its built-in mobile virtual pad
+       * does not compete with the SAVE handheld controls.
+       */
+      window.EJS_browserMode = 'desktop';
+
+      window.EJS_onGameStart = function () {
+        status.hidden = true;
+        flushInputs();
+      };
+
+      window.EJS_ready = function () {
+        flushInputs();
+      };
+
+      var loader = document.createElement('script');
+      loader.src = 'https://cdn.emulatorjs.org/4.2.3/data/loader.js';
+      loader.async = true;
+
+      loader.onload = function () {
+        status.hidden = true;
+      };
+
+      loader.onerror = function () {
+        fail('Could not load EmulatorJS.');
+      };
+
+      document.body.appendChild(loader);
+    })();
+  </script>
+</body>
+</html>
